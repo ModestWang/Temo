@@ -1,5 +1,6 @@
 #include <QApplication>
 #include <QFont>
+#include <stdio.h>
 #include "mainwindow.h"
 
 extern My_System my_system;
@@ -13,6 +14,18 @@ int main(int argc, char *argv[])
     a.setFont(QFont("serif")); // 设置中文字体，否则界面无法显示中文
     MainWindow w;
     w.show();
+
+    // 创建并开启线程
+    int result;
+    pthread_t thread1, thread2;
+    /* create the first thread. */
+    result = pthread_create(&thread1, NULL, listen_buttons, (void *)&my_system);
+    if(result)
+    {
+        perror("pthread_create: task1.\n");
+        exit(EXIT_FAILURE);
+    }
+    // pthread_join(thread1, NULL);
     
     return a.exec();
 }
