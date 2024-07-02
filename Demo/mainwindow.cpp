@@ -1,9 +1,5 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
-#include <pthread.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
 #include <sys/ioctl.h>
 #include <sys/select.h>
 #include <sys/stat.h>
@@ -11,39 +7,43 @@
 #include <sys/types.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 
+// 宏定义
 #define OUTPUT_LABEL Label_1
 #define RECENT_LABEL Label_2
 #define SOFT_CTL 1
 #define HARD_CTL 2
+#define PWM_IOCTL_SET_FREQ 1
+#define PWM_IOCTL_STOP 2
 
 // 函数声明
 void open_leds();
 void close_leds();
-void led_display();
 void open_buttons();
 void close_buttons();
 void open_beep();
 void close_beep();
 void set_beep_freq(int freq);
 void stop_beep();
-void beep_display();
 
 // 系统状态参数
-int control = 0;                    // 控制者：0-无，1-Qt按钮，2-物理按键
-int mode = 0;                       // 当前的模式：1、2、3、4
-bool leds_state[4] = {0, 0, 0, 0};  // LED 状态：0-不亮，1-亮
-int leds_dir = 0;                   // LED 流水灯方向：0-无，1-向右，2-向左
-bool beep_state = 0;                // Beep 状态：0-不响，1-响
-int led_state = 0;                  // 流水灯计数变量
-bool led_judge = 0;                 // 流水灯状态变量
-bool timer1_state = 0;              // 定时器1状态变量，0-关闭，1-打开
-bool timer2_state = 0;              // 定时器2状态变量，0-关闭，1-打开
-int beep_count = 0;                 // 峰鸣器计数变量
-int start_count = 0;                // 自检LED计数变量
-char buttons[6] = {'0', '0', '0', '0', '0', '0'};
-#define PWM_IOCTL_SET_FREQ 1
-#define PWM_IOCTL_STOP 2
+int     control = 0;                    // 控制者：0-无，1-Qt按钮，2-物理按键
+int     mode = 0;                       // 当前的模式：1、2、3、4
+bool    leds_state[4] = {0, 0, 0, 0};   // LED 状态：0-不亮，1-亮
+int     leds_dir = 0;                   // LED 流水灯方向：0-无，1-向右，2-向左
+bool    beep_state = 0;                 // Beep 状态：0-不响，1-响
+int     led_state = 0;                  // 流水灯计数变量
+bool    led_judge = 0;                  // 流水灯状态变量
+bool    timer1_state = 0;               // 定时器1状态变量，0-关闭，1-打开
+bool    timer2_state = 0;               // 定时器2状态变量，0-关闭，1-打开
+bool    timer3_state = 0;               // 定时器3状态变量，0-关闭，1-打开
+int     beep_count = 0;                 // 峰鸣器计数变量
+int     start_count = 0;                // 自检LED计数变量
+char    buttons[6] = {'0', '0', '0', '0', '0', '0'};
+int     BEEP_FIRQ = 1000;               // 峰鸣器频率，可变
 
 // 设备定义
 static int my_leds;
@@ -58,70 +58,77 @@ QString modeStr_2 = "当前控制模式为模式二";
 QString modeStr_3 = "当前控制模式为模式三";
 QString modeStr_4 = "当前控制模式为模式四";
 
-//// MainWindow构造函数 ////
+
 MainWindow* instance;
 MainWindow *MainWindow::getInstance() {return instance;}
 
+//// MainWindow构造函数 ////
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow)
 {
     instance = this;    // 获取窗口实例，以便在普通函数中使用
+
     ui->setupUi(this);
     ui->centralWidget->setStyleSheet("QWidget#centralWidget{border-image:url(:/images/A002.jpg)}"); // 加载背景图片
 
     // LED复选框
-    connect(ui->LED_1_chk, SIGNAL(clicked()), this, SLOT(on_LED_1_chk_clicked()));
-    connect(ui->LED_2_chk, SIGNAL(clicked()), this, SLOT(on_LED_2_chk_clicked()));
-    connect(ui->LED_3_chk, SIGNAL(clicked()), this, SLOT(on_LED_3_chk_clicked()));
-    connect(ui->LED_4_chk, SIGNAL(clicked()), this, SLOT(on_LED_4_chk_clicked()));
+    connect(ui->LED_1_chk,  SIGNAL(clicked()), this, SLOT(on_LED_1_chk_clicked()));
+    connect(ui->LED_2_chk,  SIGNAL(clicked()), this, SLOT(on_LED_2_chk_clicked()));
+    connect(ui->LED_3_chk,  SIGNAL(clicked()), this, SLOT(on_LED_3_chk_clicked()));
+    connect(ui->LED_4_chk,  SIGNAL(clicked()), this, SLOT(on_LED_4_chk_clicked()));
 
     // Beep复选框
-    connect(ui->Beep_chk, SIGNAL(clicked()), this, SLOT(on_Beep_chk_clicked()));
+    connect(ui->Beep_chk,   SIGNAL(clicked()), this, SLOT( on_Beep_chk_clicked()));
 
     // Mode按键
     connect(ui->Mode_1_btn, SIGNAL(clicked()), this, SLOT(on_Mode_1_btn_clicked()));
     connect(ui->Mode_2_btn, SIGNAL(clicked()), this, SLOT(on_Mode_2_btn_clicked()));
     connect(ui->Mode_3_btn, SIGNAL(clicked()), this, SLOT(on_Mode_3_btn_clicked()));
     connect(ui->Mode_4_btn, SIGNAL(clicked()), this, SLOT(on_Mode_4_btn_clicked()));
-    connect(ui->Clear_btn, SIGNAL(clicked()), this, SLOT(on_Clear_btn_clicked()));
+    connect(ui->Clear_btn,  SIGNAL(clicked()), this, SLOT( on_Clear_btn_clicked()));
 
-//// 启动设备
-//    open_leds();
-//    open_buttons();
-//    open_beep();
+    timer3_init(500);   // 开机自检，定时器3初始化，定时0.5秒
+    button_init();      // 按键初始化
+    // // 启动设备
+    // open_leds();
+    // open_buttons();
+    // open_beep();
+
 }
 
 //// MainWindow析构函数 ////
 MainWindow::~MainWindow()
 {
     delete ui;
-//// 关闭
-//    close_leds();
-//    close_buttons();
-//    close_beep();
+    delete timer1;
+    delete timer2;
+    delete timer3;
+    // // 关闭设备
+    // close_leds();
+    // close_buttons();
+    // close_beep();
 }
 
-// 输出提示
-void MainWindow::printInfo(int control, int mode)
+// TODO: 输出提示 （乱码）
+void MainWindow::printInfo(int ctl, int mod)
 {
     QString controlStr = "";
     QString modeStr = "";
-    switch(control)
+    switch(ctl)
     {
-        case 1: controlStr = controlStr_qt; break;
-        case 2: controlStr = controlStr_py; break;
-        default: controlStr = "";
+        case 1:     controlStr = controlStr_qt; break;
+        case 2:     controlStr = controlStr_py; break;
+        default:    controlStr = "";            break;
     }
-    switch(mode)
+    switch(mod)
     {
-        case 1: modeStr = modeStr_1; break;
-        case 2: modeStr = modeStr_2; break;
-        case 3: modeStr = modeStr_3; break;
-        case 4: modeStr = modeStr_4; break;
-        default: modeStr = ""; break;
+        case 1:     modeStr = modeStr_1; break;
+        case 2:     modeStr = modeStr_2; break;
+        case 3:     modeStr = modeStr_3; break;
+        case 4:     modeStr = modeStr_4; break;
+        default:    modeStr = "";        break;
     }
-
     QString infoStr = modeStr + controlStr;
     ui->OUTPUT_LABEL->setText(infoStr);
 }
@@ -132,30 +139,25 @@ void MainWindow::printInfo(int control, int mode)
 // CheckBox
 void MainWindow::on_LED_1_chk_clicked()
 {
-    control = 1;
     ioctl(my_leds, int(ui->LED_1_chk->isChecked()), 0);
 }
 void MainWindow::on_LED_2_chk_clicked()
 {
-    control = 1;
     ioctl(my_leds, int(ui->LED_2_chk->isChecked()), 1);
 }
 void MainWindow::on_LED_3_chk_clicked()
 {
-    control = 1;
     ioctl(my_leds, int(ui->LED_1_chk->isChecked()), 2);
 }
 void MainWindow::on_LED_4_chk_clicked()
 {
-    control = 1;
     ioctl(my_leds, int(ui->LED_1_chk->isChecked()), 3);
 }
 void MainWindow::on_Beep_chk_clicked()
 {
-    control = 1;
     if(ui->Beep_chk->isChecked())
     {
-        set_beep_freq(1000);//使峰鸣器鸣叫
+        set_beep_freq(BEEP_FIRQ);//使峰鸣器鸣叫
     }
     else
     {
@@ -163,25 +165,22 @@ void MainWindow::on_Beep_chk_clicked()
     }
 }
 
+
 // Button
 void MainWindow::on_Mode_1_btn_clicked()
 {
-    mode = 1;
     do_mode_1(SOFT_CTL);
 }
 void MainWindow::on_Mode_2_btn_clicked()
 {
-    mode = 2;
     do_mode_2(SOFT_CTL);
 }
 void MainWindow::on_Mode_3_btn_clicked()
 {
-    mode = 3;
     do_mode_3(SOFT_CTL);
 }
 void MainWindow::on_Mode_4_btn_clicked()
 {
-    mode = 4;
     do_mode_4(SOFT_CTL);
 }
 void MainWindow::on_Clear_btn_clicked()
@@ -189,7 +188,8 @@ void MainWindow::on_Clear_btn_clicked()
     control = SOFT_CTL;
     ui->OUTPUT_LABEL->setText(QString::fromUtf8(""));
 }
-// Todo: 这是拓展功能
+
+// TODO: 这是拓展功能
 //void MainWindow::on_Extend_btn_clicked()
 //{
 //    control = SOFT_CTL;
@@ -198,10 +198,10 @@ void MainWindow::on_Clear_btn_clicked()
 
 
 //定时器1初始化函数，定时0.5秒
-void MainWindow::timer1_init()
+void MainWindow::timer1_init(int setTime)
 {
     this->timer1 = new QTimer;
-    this->timer1->setInterval(500);
+    this->timer1->setInterval(setTime);
     connect(this->timer1, SIGNAL(timeout()), this, SLOT(led_display()));
     this->timer1->start();
 }
@@ -223,17 +223,23 @@ void MainWindow::led_display()
     ioctl(my_leds, 1, led_state);
     //LED递增
     if(!led_judge)
+    {
         led_state++;
+    }
     //LED递减
     else
+    {
         led_state--;
+    }
     //当第四个LED点亮时，反转状态
-    if(led_state==4){
+    if(led_state >= 4)
+    {
         led_judge = true;
         led_state = 2;
     }
     //当第一个LED点亮时，反转状态
-    if(led_state==-1){
+    if(led_state < 0)
+    {
         led_judge = false;
         led_state = 1;
     }
@@ -241,10 +247,10 @@ void MainWindow::led_display()
 
 
 //定时器2初始化函数，定时1秒
-void MainWindow::timer2_init()
+void MainWindow::timer2_init(int setTime)
 {
     this->timer2 = new QTimer;
-    this->timer2->setInterval(1000);
+    this->timer2->setInterval(setTime);
     connect(this->timer2, SIGNAL(timeout()), this, SLOT(beep_display()));
     this->timer2->start();
 }
@@ -259,22 +265,22 @@ void MainWindow::beep_display()
 {
     if(!beep_count%2)
     {
-        ioctl(my_beep, 1,1);
+        set_beep_freq(BEEP_FIRQ);
     }
     else
     {
-        ioctl(my_beep, 0,1);
+        stop_beep();
     }
     beep_count++;
 }
 
 
 //定时器3初始化函数，定时0.5秒
-void MainWindow::timer3_init()
+void MainWindow::timer3_init(int setTime)
 {
     this->timer3 = new QTimer;
-    this->timer3->setInterval(500);
-    connect(this->timer3, SIGNAL(timeout()), this,SLOT(start_display()));
+    this->timer3->setInterval(setTime);
+    connect(this->timer3, SIGNAL(timeout()), this,SLOT(selfpost()));
     this->timer3->start();
 }
 //定时器3关闭函数
@@ -284,10 +290,10 @@ void MainWindow::timer3_close()
     this->timer3 = 0;
 }
 //这是上电之后的自检程序，同时也是定时器三的信号槽函数，定时器三定时0.5秒，每隔0.5秒，此函数被调用一次
-void MainWindow::start_display()
+void MainWindow::selfpost()
 {
     //因为只需要流水一遍，因此当四个LED都闪烁之后，就关闭定时器
-    if(start_count>=4)
+    if(start_count >= 4)
     {
         timer3_close();
     }
@@ -405,7 +411,7 @@ void set_beep_freq(int freq)
     int ret = ioctl(my_beep, PWM_IOCTL_SET_FREQ, freq);
     if(ret < 0)
     {
-        perror("set the frequency of the beep");
+        perror("set beep frequency");
         exit(1);
     }
 }
@@ -423,9 +429,10 @@ void stop_beep()
 //////// 按键模式 ////////
 void MainWindow::do_mode_1(int ctl)
 {
-    close_time_1_2_if_opened();
-    control = ctl;
-    mode = 1;
+    //若有定时器开启，先把它们关闭
+    close_timer_if_opened();
+    // 设置控制者和模式
+    control = ctl; mode = 1;
     printInfo(control, mode);
     // LED全亮
     ioctl(my_leds, 1, 0);
@@ -435,9 +442,10 @@ void MainWindow::do_mode_1(int ctl)
 }
 void MainWindow::do_mode_2(int ctl)
 {
-    close_time_1_2_if_opened();
-    control = ctl;
-    mode = 2;
+    //若有定时器开启，先把它们关闭
+    close_timer_if_opened();
+    // 设置控制者和模式
+    control = ctl; mode = 2;
     printInfo(control, mode);
     //关闭所有峰鸣器与LED
     stop_beep();
@@ -448,35 +456,35 @@ void MainWindow::do_mode_2(int ctl)
 }
 void MainWindow::do_mode_3(int ctl)
 {
-    close_time_1_2_if_opened();
-    control = ctl;
-    mode = 3;
+    //若有定时器开启，先把它们关闭
+    close_timer_if_opened();
+    // 设置控制者和模式
+    control = ctl; mode = 3;
     printInfo(control, mode);
     //打开定时器1
-    timer1_init();
+    timer1_init(500);
     timer1_state = 1;
 }
 void MainWindow::do_mode_4(int ctl)
 {
-    close_time_1_2_if_opened();
-    control = ctl;
-    mode = 4;
+    //若有定时器开启，先把它们关闭
+    close_timer_if_opened();
+    // 设置控制者和模式
+    control = ctl; mode = 4;
     printInfo(control, mode);
     //打开定时器2
-    timer2_init();
+    timer2_init(1000);
     timer2_state = 1;
 }
-void MainWindow::close_time_1_2_if_opened()
+void MainWindow::close_timer_if_opened()
 {
     //若有定时器开启，先把它们关闭
     if(timer1_state)
     {
-        timer1_close();
-        timer1_state = 0;
+        timer1_close(); timer1_state = 0;
     }
     if(timer2_state)
     {
-        timer2_close();
-        timer2_state = 0;
+        timer2_close(); timer2_state = 0;
     }
 }
