@@ -523,7 +523,7 @@ void MainWindow::do_mode_2(int ctl)
     ui->LED_2_chk->setChecked(leds_state[1]);
     ui->LED_3_chk->setChecked(leds_state[2]);
     ui->LED_4_chk->setChecked(leds_state[3]);
-    ui->Beep_chk->setChecked(beep_state);
+    ui->Beep_chk ->setChecked(beep_state);
 }
 void MainWindow::do_mode_3(int ctl)
 {
@@ -572,5 +572,5 @@ void MainWindow::close_timer_if_opened()
     ui->LED_2_chk->setChecked(leds_state[1]);
     ui->LED_3_chk->setChecked(leds_state[2]);
     ui->LED_4_chk->setChecked(leds_state[3]);
-    ui->Beep_chk->setChecked(beep_state);
+    ui->Beep_chk ->setChecked(beep_state);
 }
