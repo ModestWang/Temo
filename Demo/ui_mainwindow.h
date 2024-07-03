@@ -108,10 +108,10 @@ public:
         LED_3_chk->setText(QApplication::translate("MainWindow", "LED 3", 0, QApplication::UnicodeUTF8));
         LED_4_chk->setText(QApplication::translate("MainWindow", "LED 4", 0, QApplication::UnicodeUTF8));
         Beep_chk->setText(QApplication::translate("MainWindow", "Beep", 0, QApplication::UnicodeUTF8));
-        Mode_1_btn->setText(QApplication::translate("MainWindow", "\346\250\241\345\274\217\344\270\200", 0, QApplication::UnicodeUTF8));
-        Mode_2_btn->setText(QApplication::translate("MainWindow", "\346\250\241\345\274\217\344\272\214", 0, QApplication::UnicodeUTF8));
-        Mode_3_btn->setText(QApplication::translate("MainWindow", "\346\250\241\345\274\217\344\270\211", 0, QApplication::UnicodeUTF8));
-        Mode_4_btn->setText(QApplication::translate("MainWindow", "\346\250\241\345\274\217\345\233\233", 0, QApplication::UnicodeUTF8));
+        Mode_1_btn->setText(QApplication::translate("MainWindow", "Mode 1", 0, QApplication::UnicodeUTF8));
+        Mode_2_btn->setText(QApplication::translate("MainWindow", "Mode 2", 0, QApplication::UnicodeUTF8));
+        Mode_3_btn->setText(QApplication::translate("MainWindow", "Mode 3", 0, QApplication::UnicodeUTF8));
+        Mode_4_btn->setText(QApplication::translate("MainWindow", "Mode 4", 0, QApplication::UnicodeUTF8));
         Clear_btn->setText(QApplication::translate("MainWindow", "Clear", 0, QApplication::UnicodeUTF8));
         Label_1->setText(QString());
         Label_2->setText(QString());

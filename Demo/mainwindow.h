@@ -39,6 +39,7 @@ public:
     QTimer* timer1;
     QTimer* timer2;
     QTimer* timer3;
+    QSocketNotifier* notifier;
     
 private:
     Ui::MainWindow *ui;

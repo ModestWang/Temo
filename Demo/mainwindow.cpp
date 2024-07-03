@@ -17,7 +17,7 @@
 #define SOFT_CTL 1
 #define HARD_CTL 2
 #define PWM_IOCTL_SET_FREQ 1
-#define PWM_IOCTL_STOP 2
+#define PWM_IOCTL_STOP 0
 
 // 函数声明
 void open_leds();
@@ -51,12 +51,18 @@ static int my_buttons;
 static int my_beep;
 
 // 提示信息
-QString controlStr_qt = ", 并由Qt按钮控制";
-QString controlStr_py = ", 并由物理按键控制";
-QString modeStr_1 = "当前控制模式为模式一";
-QString modeStr_2 = "当前控制模式为模式二";
-QString modeStr_3 = "当前控制模式为模式三";
-QString modeStr_4 = "当前控制模式为模式四";
+//QString controlStr_qt = ", 并由Qt按钮控制";
+//QString controlStr_py = ", 并由物理按键控制";
+//QString modeStr_1 = "当前控制模式为模式一";
+//QString modeStr_2 = "当前控制模式为模式二";
+//QString modeStr_3 = "当前控制模式为模式三";
+//QString modeStr_4 = "当前控制模式为模式四";
+QString controlStr_qt = " by Qt";
+QString controlStr_py = " by real";
+QString modeStr_1 = "Mode 1";
+QString modeStr_2 = "Mode 2";
+QString modeStr_3 = "Mode 3";
+QString modeStr_4 = "Mode 4";
 
 
 MainWindow* instance;
@@ -88,13 +94,16 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->Mode_4_btn, SIGNAL(clicked()), this, SLOT(on_Mode_4_btn_clicked()));
     connect(ui->Clear_btn,  SIGNAL(clicked()), this, SLOT( on_Clear_btn_clicked()));
 
-    timer3_init(500);   // 开机自检，定时器3初始化，定时0.5秒
-    button_init();      // 按键初始化
-    // // 启动设备
-    // open_leds();
-    // open_buttons();
-    // open_beep();
+    // 开机自检，定时器3初始化，定时0.5秒
+    timer3_init(500);
 
+    // 启动设备
+    open_leds();
+    open_buttons();
+    open_beep();
+
+    // 按键初始化
+    button_init();
 }
 
 //// MainWindow析构函数 ////
@@ -104,10 +113,10 @@ MainWindow::~MainWindow()
     delete timer1;
     delete timer2;
     delete timer3;
-    // // 关闭设备
-    // close_leds();
-    // close_buttons();
-    // close_beep();
+    // 关闭设备
+    close_leds();
+    close_buttons();
+    close_beep();
 }
 
 // TODO: 输出提示 （乱码）
@@ -134,7 +143,7 @@ void MainWindow::printInfo(int ctl, int mod)
 }
 
 /**************************************************/
-/********************  事件  ***********************/
+/*******************  Soft事件  ********************/
 /**************************************************/
 // CheckBox
 void MainWindow::on_LED_1_chk_clicked()
@@ -147,11 +156,11 @@ void MainWindow::on_LED_2_chk_clicked()
 }
 void MainWindow::on_LED_3_chk_clicked()
 {
-    ioctl(my_leds, int(ui->LED_1_chk->isChecked()), 2);
+    ioctl(my_leds, int(ui->LED_3_chk->isChecked()), 2);
 }
 void MainWindow::on_LED_4_chk_clicked()
 {
-    ioctl(my_leds, int(ui->LED_1_chk->isChecked()), 3);
+    ioctl(my_leds, int(ui->LED_4_chk->isChecked()), 3);
 }
 void MainWindow::on_Beep_chk_clicked()
 {
@@ -196,7 +205,9 @@ void MainWindow::on_Clear_btn_clicked()
 //    ui->OUTPUT_LABEL->setText(QString::fromUtf8("See you again"));
 //}
 
-
+/**************************************************/
+/********************  Hard事件  *******************/
+/**************************************************/
 //定时器1初始化函数，定时0.5秒
 void MainWindow::timer1_init(int setTime)
 {
@@ -221,6 +232,38 @@ void MainWindow::led_display()
     ioctl(my_leds, 0, 3);
     //点亮当前制定的LED
     ioctl(my_leds, 1, led_state);
+    switch(led_state)
+    {
+        case 0: leds_state[0] = true;
+                leds_state[1] = false;
+                leds_state[2] = false;
+                leds_state[3] = false;
+                break;
+        case 1: leds_state[0] = false;
+                leds_state[1] = true;
+                leds_state[2] = false;
+                leds_state[3] = false;
+                break;
+        case 2: leds_state[0] = false;
+                leds_state[1] = false;
+                leds_state[2] = true;
+                leds_state[3] = false;
+                break;
+        case 3: leds_state[0] = false;
+                leds_state[1] = false;
+                leds_state[2] = false;
+                leds_state[3] = true;
+                break;
+        default:leds_state[0] = false;
+                leds_state[1] = false;
+                leds_state[2] = false;
+                leds_state[3] = false;
+                break;
+    }
+    ui->LED_1_chk->setChecked(leds_state[0]);
+    ui->LED_2_chk->setChecked(leds_state[1]);
+    ui->LED_3_chk->setChecked(leds_state[2]);
+    ui->LED_4_chk->setChecked(leds_state[3]);
     //LED递增
     if(!led_judge)
     {
@@ -263,15 +306,20 @@ void MainWindow::timer2_close()
 //定时器2的信号槽函数，定时器2定时1秒钟，每隔1秒钟，调用一次此函数
 void MainWindow::beep_display()
 {
-    if(!beep_count%2)
+    beep_count++;
+    beep_count %= 2;
+    if(beep_count)
     {
         set_beep_freq(BEEP_FIRQ);
+        beep_state = true;
+        ui->Beep_chk->setChecked(beep_state);
     }
     else
     {
         stop_beep();
+        beep_state = false;
+        ui->Beep_chk->setChecked(beep_state);
     }
-    beep_count++;
 }
 
 
@@ -293,9 +341,13 @@ void MainWindow::timer3_close()
 void MainWindow::selfpost()
 {
     //因为只需要流水一遍，因此当四个LED都闪烁之后，就关闭定时器
-    if(start_count >= 4)
+    if(start_count > 8)
     {
         timer3_close();
+        ioctl(my_leds, 0, 0);
+        ioctl(my_leds, 0, 1);
+        ioctl(my_leds, 0, 2);
+        ioctl(my_leds, 0, 3);
     }
     else
     {
@@ -305,7 +357,8 @@ void MainWindow::selfpost()
         ioctl(my_leds, 0,2);
         ioctl(my_leds, 0,3);
         //亮起对应的LED
-        ioctl(my_leds, 1,start_count);
+        if(start_count % 2)
+            ioctl(my_leds, 1, start_count/2);
     }
     start_count++;
 }
@@ -315,7 +368,7 @@ void MainWindow::selfpost()
 void MainWindow::button_init()
 {
     //将按键与串口监听绑定
-    QSocketNotifier* notifier = new QSocketNotifier(my_buttons, QSocketNotifier::Read, this);
+    notifier = new QSocketNotifier(my_buttons, QSocketNotifier::Read, this);
     //将按键与按键响应函数绑定
     connect(notifier, SIGNAL(activated(int)), this, SLOT(onKeyChanged()));
 }
@@ -352,7 +405,7 @@ void MainWindow::onKeyChanged(){
 /**************************************************/
 /********************  硬件  ***********************/
 /**************************************************/
-// 打开/dev/leds 设备文件 //
+//// 打开/dev/leds 设备文件 ////
 void open_leds()
 {
     ::system("kill -s STOP `pidof led-player`");
@@ -369,8 +422,7 @@ void close_leds()
     my_leds = -1;
 }
 
-
-// 打开/dev/buttons 设备文件 //
+//// 打开/dev/buttons 设备文件 ////
 void open_buttons()
 {
     my_buttons = open("/dev/buttons", O_RDONLY | O_NONBLOCK);
@@ -386,8 +438,7 @@ void close_buttons()
     my_buttons = -1;
 }
 
-
-// 打开/dev/pwm 设备文件 //
+//// 打开/dev/pwm 设备文件 ////
 void open_beep()
 {
     my_beep = open("/dev/pwm", 0);
@@ -426,7 +477,9 @@ void stop_beep()
 }
 
 
-//////// 按键模式 ////////
+/**************************************************/
+/********************  按键模式  *******************/
+/**************************************************/
 void MainWindow::do_mode_1(int ctl)
 {
     //若有定时器开启，先把它们关闭
@@ -439,6 +492,14 @@ void MainWindow::do_mode_1(int ctl)
     ioctl(my_leds, 1, 1);
     ioctl(my_leds, 1, 2);
     ioctl(my_leds, 1, 3);
+    leds_state[0] = true;
+    leds_state[1] = true;
+    leds_state[2] = true;
+    leds_state[3] = true;
+    ui->LED_1_chk->setChecked(leds_state[0]);
+    ui->LED_2_chk->setChecked(leds_state[1]);
+    ui->LED_3_chk->setChecked(leds_state[2]);
+    ui->LED_4_chk->setChecked(leds_state[3]);
 }
 void MainWindow::do_mode_2(int ctl)
 {
@@ -453,6 +514,16 @@ void MainWindow::do_mode_2(int ctl)
     ioctl(my_leds, 0, 1);
     ioctl(my_leds, 0, 2);
     ioctl(my_leds, 0, 3);
+    leds_state[0] = false;
+    leds_state[1] = false;
+    leds_state[2] = false;
+    leds_state[3] = false;
+    beep_state    = false;
+    ui->LED_1_chk->setChecked(leds_state[0]);
+    ui->LED_2_chk->setChecked(leds_state[1]);
+    ui->LED_3_chk->setChecked(leds_state[2]);
+    ui->LED_4_chk->setChecked(leds_state[3]);
+    ui->Beep_chk->setChecked(beep_state);
 }
 void MainWindow::do_mode_3(int ctl)
 {
@@ -487,4 +558,19 @@ void MainWindow::close_timer_if_opened()
     {
         timer2_close(); timer2_state = 0;
     }
+    stop_beep();
+    ioctl(my_leds, 0, 0);
+    ioctl(my_leds, 0, 1);
+    ioctl(my_leds, 0, 2);
+    ioctl(my_leds, 0, 3);
+    leds_state[0] = false;
+    leds_state[1] = false;
+    leds_state[2] = false;
+    leds_state[3] = false;
+    beep_state    = false;
+    ui->LED_1_chk->setChecked(leds_state[0]);
+    ui->LED_2_chk->setChecked(leds_state[1]);
+    ui->LED_3_chk->setChecked(leds_state[2]);
+    ui->LED_4_chk->setChecked(leds_state[3]);
+    ui->Beep_chk->setChecked(beep_state);
 }

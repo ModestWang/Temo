@@ -89,7 +89,7 @@
      </rect>
     </property>
     <property name="text">
-     <string>模式一</string>
+     <string>Mode 1</string>
     </property>
    </widget>
    <widget class="QPushButton" name="Mode_2_btn">
@@ -102,7 +102,7 @@
      </rect>
     </property>
     <property name="text">
-     <string>模式二</string>
+     <string>Mode 2</string>
     </property>
    </widget>
    <widget class="QPushButton" name="Mode_3_btn">
@@ -115,7 +115,7 @@
      </rect>
     </property>
     <property name="text">
-     <string>模式三</string>
+     <string>Mode 3</string>
     </property>
    </widget>
    <widget class="QPushButton" name="Mode_4_btn">
@@ -128,7 +128,7 @@
      </rect>
     </property>
     <property name="text">
-     <string>模式四</string>
+     <string>Mode 4</string>
     </property>
    </widget>
    <widget class="QPushButton" name="Clear_btn">
